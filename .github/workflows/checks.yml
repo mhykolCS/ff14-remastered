@@ -15,4 +15,5 @@ jobs:
       - run: dotnet run --project tests/CoreChecks -c Release
       - run: dotnet run --project tests/WritingChecks -c Release
       - run: dotnet run --project tests/PolicyChecks -c Release
+      - run: dotnet run --project tests/MinionChecks -c Release
       - run: python3 -m py_compile tools/build_job_bars.py tools/package_release.py

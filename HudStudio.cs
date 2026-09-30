@@ -30,6 +30,7 @@ public sealed class StudioSettings
     public bool RpBubblePreviewRequested;
     public bool ChatPresencePreviewRequested;
     public bool ChatFadeEnabled,ManageDirectChat;
+    public bool MinionsEnabled,KeepHotbarsApart;
     public float RpButtonSize=44,RpOffsetX=0,RpOffsetY=0,RpBorderOpacity=.72f,RpBorderInset=12;
 }
 public sealed class HudImage
@@ -65,6 +66,8 @@ public sealed unsafe class HudStudio : IDisposable
     OverlayController? overlay;
     JobDockNode? dock;
     RpTools? rpTools;
+    MinionTools? minions;
+    IObjectTable? objects;
     IrohChatStyle? chatStyle;
     ChatPresence? chatPresence;
     RpSpeechBubbles? speechBubbles;
@@ -82,10 +85,27 @@ public sealed unsafe class HudStudio : IDisposable
     public bool CanShowCombatEmotes=>settings.CombatEmotesEnabled && Mode=="combat" && ShouldShow && !gui.GameUiHidden;
     public bool CombatEmotesVisible=>combatEmotesOpen && CanShowCombatEmotes;
     public Vector2 CombatEmotesAnchor=>dock?.EmotesAnchor??new Vector2(128,740);
+    public Vector2 MinionsAnchor=>ShouldShow && dock!=null?dock.MinionsAnchor:new Vector2(settings.X,settings.Y);
+    public bool CanShowMinions=>settings.MinionsEnabled && (RpView || (Mode=="combat" && player.IsLoaded && !cinematic && !gui.GameUiHidden && !condition[ConditionFlag.WatchingCutscene] && !condition[ConditionFlag.WatchingCutscene78] && !condition[ConditionFlag.BetweenAreas] && !condition[ConditionFlag.BetweenAreas51]));
+    public uint CurrentMinion {
+        get {
+            var local=objects?.LocalPlayer;if(local==null || !player.IsLoaded)return 0;
+            var character=(FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)local.Address;
+            return character->CompanionData.CompanionObject!=null?character->CompanionData.CompanionObject->BaseId:character->CompanionData.CompanionId;
+        }
+    }
+    public void CloseOtherMenus(){CloseCombatEmotes();dock?.Close();}
+    public void CloseMinions()=>minions?.Close();
+    public Vector2 ClearChat(Vector2 origin,Vector2 size) {
+        var a=gui.GetAddonByName("ChatLog");if(a.IsNull || !a.IsVisible)return origin;
+        var addon=(AtkUnitBase*)a.Address;
+        return HudSpacing.AboveChat(origin,size,new(a.X,a.Y),new(addon->GetScaledWidth(true),addon->GetScaledHeight(true)),FrameMargin);
+    }
     public void CloseCombatEmotes(){combatEmotesOpen=false;nextStatus=0;}
-    public void ToggleCombatEmotes(){if(!CanShowCombatEmotes)return;combatEmotesOpen=!combatEmotesOpen;dock?.Close();nextStatus=0;}
+    public void ToggleCombatEmotes(){if(!CanShowCombatEmotes)return;combatEmotesOpen=!combatEmotesOpen;dock?.Close();minions?.Close();nextStatus=0;}
     public void OpenSettings()=>open=true;
     public void InitializeChat(IObjectTable objects) {
+        this.objects=objects;
         speechBubbles=new RpSpeechBubbles(this,objects,gui);
         chatPresence=new ChatPresence(this,objects,chat);
         chatStyle=new IrohChatStyle(chat,this,player,log,speechBubbles,chatPresence);
@@ -130,21 +150,22 @@ public sealed unsafe class HudStudio : IDisposable
         if(disposed || failed || !initialization.IsCompleted) return;
         if(initialization.IsFaulted){failed=true;error=initialization.Exception?.GetBaseException().Message??"Toolkit initialization failed";log.Error(error);return;}
         try {
-            if(overlay==null) {overlay=new OverlayController();dock=new JobDockNode(this,data);overlay.AddNode(dock);rpTools=new RpTools(this,data,chat,player,directory,overlay);}
+            if(overlay==null) {overlay=new OverlayController();dock=new JobDockNode(this,data);overlay.AddNode(dock);rpTools=new RpTools(this,data,chat,player,directory,overlay);minions=new MinionTools(this,data,player,chat,directory,overlay);}
             if(!CanShowCombatEmotes || Escape)combatEmotesOpen=false;
             rpTools?.Tick();
+            minions?.Tick();
             chatFade?.Tick();
             chatPresence?.Tick();
             if(settings.ChatPresencePreviewRequested){settings.ChatPresencePreviewRequested=false;Save();chatPresence?.Preview();}
             if(settings.RpBubblePreviewRequested && RpMinimal){settings.RpBubblePreviewRequested=false;Save();speechBubbles?.Preview();}
-            if(Environment.TickCount64>=nextSpacing){nextSpacing=Environment.TickCount64+250;InsetHud();}
+            if(Environment.TickCount64>=nextSpacing){nextSpacing=Environment.TickCount64+250;SpaceHotbars();InsetHud();}
             if(imagesDirty){RestoreImages();imagesDirty=false;}
             if(Environment.TickCount64>=nextStatus) {
                 nextStatus=Environment.TickCount64+(open?1000:10000);
                 File.WriteAllText(Path.Combine(directory,"hud-studio-status.json"),JsonConvert.SerializeObject(new{
                     Mode=Mode,settings.DockEnabled,Visible=ShouldShow,ToolkitReady=overlay!=null,DefaultNativeAppearance=settings.Images.All(i=>!i.Enabled),
                     RpMinimal,CombatEmotesVisible,Border=ShowRpBorder,FrameMargin,FrameBounds=frameBounds,ExternalFps=externalFps,UiMouse=uiMouse,UiCapturesMouse=uiCapturesMouse,RpTools=rpTools?.Status,ChatStyle=chatStyle?.Status,
-                    ChatFade=chatFade?.Status,ChatPresence=chatPresence?.Status,Category=dock?.Expanded,Images=images.Select(kv=>new{Name=kv.Key,Alpha=kv.Value.Node.Alpha,Width=kv.Value.Node.Width,Height=kv.Value.Node.Height}).ToArray(),KnownElements=observed.Order().ToArray(),Error=error,
+                    Minions=minions?.Status,ChatFade=chatFade?.Status,ChatPresence=chatPresence?.Status,Category=dock?.Expanded,Images=images.Select(kv=>new{Name=kv.Key,Alpha=kv.Value.Node.Alpha,Width=kv.Value.Node.Width,Height=kv.Value.Node.Height}).ToArray(),KnownElements=observed.Order().ToArray(),Error=error,
                     CurrentJob=NativePlayer.Instance()==null?0:NativePlayer.Instance()->CurrentClassJobId},Formatting.Indented));
             }
         }catch(Exception ex){failed=true;log.Error(ex,"HUD Studio suspended");error=ex.Message;}
@@ -155,6 +176,24 @@ public sealed unsafe class HudStudio : IDisposable
     public bool RpMinimal=>cinematic && RpView;
     public bool ShowRpBorder=>settings.RpBorderEnabled && RpView;
     public float FrameMargin=>ShowRpBorder && settings.RpKeepInsideFrame?RpFrame.SafeMargin(settings.RpBorderInset):32;
+    void SpaceHotbars()
+    {
+        if(!settings.KeepHotbarsApart || cinematic || !player.IsLoaded || gui.GameUiHidden || Mode is not ("combat" or "rp"))return;
+        foreach(var editor in new[]{"HudLayout","ConfigAddon","ConfigHUD"}){var a=gui.GetAddonByName(editor);if(!a.IsNull && a.IsVisible)return;}
+        var device=FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.Device.Instance();if(device==null)return;
+        string[] names={"_Exp","_ParameterWidget","_ActionBar03","_ActionBar","_ActionBar01","_ActionBar02"};
+        var sizes=new Dictionary<string,Vector2>();
+        foreach(var name in names.Concat(new[]{"_StatusCustom0","_StatusCustom1"})) {
+            var a=gui.GetAddonByName(name);if(a.IsNull || !a.IsVisible)continue;
+            var p=(AtkUnitBase*)a.Address;sizes[name]=new(p->GetScaledWidth(true),p->GetScaledHeight(true));
+        }
+        float chatRight=0;var chatAddon=gui.GetAddonByName("ChatLog");
+        if(Mode=="rp" && !chatAddon.IsNull && chatAddon.IsVisible)chatRight=chatAddon.X+((AtkUnitBase*)chatAddon.Address)->GetScaledWidth(true)+16;
+        foreach(var (name,position) in HudSpacing.Place(new(device->Width,device->Height),FrameMargin,chatRight,sizes)) {
+            var a=gui.GetAddonByName(name);if(a.IsNull || !a.IsVisible)continue;
+            ((AtkUnitBase*)a.Address)->SetPosition((short)Math.Round(position.X),(short)Math.Round(position.Y));
+        }
+    }
     void InsetHud() {
         frameBounds.Clear();
         if(!ShowRpBorder || !settings.RpKeepInsideFrame)return;
@@ -305,6 +344,7 @@ public sealed unsafe class HudStudio : IDisposable
             bool changed=false;
             changed|=ImGui.Checkbox("Show job menu",ref settings.DockEnabled);
             changed|=ImGui.Checkbox("Emotes button below combat job menu",ref settings.CombatEmotesEnabled);
+            changed|=ImGui.Checkbox("Keep native hotbars, HP/MP and EXP separated",ref settings.KeepHotbarsApart);
             changed|=ImGui.Checkbox("Only on the combat display profile",ref settings.CombatOnly);
             changed|=ImGui.Checkbox("Show locked jobs",ref settings.ShowLockedJobs);
             changed|=ImGui.SliderFloat("Horizontal position",ref settings.X,0,3000,"%.0f");
@@ -313,6 +353,11 @@ public sealed unsafe class HudStudio : IDisposable
             changed|=ImGui.SliderFloat("Spacing",ref settings.Gap,0,20,"%.0f");
             ImGui.TextWrapped("Click a category to expand its row; click again to close it. Choose a job to equip its saved set. Dimmed entries need an unlocked job and a usable saved set. Gear swaps are disabled during combat, crafting, gathering, and cutscenes.");
             if(changed){settings.Size=Math.Clamp(settings.Size,32,96);Save();}
+        }
+        if(ImGui.CollapsingHeader("Minion favourites",ImGuiTreeNodeFlags.DefaultOpen)) {
+            if(ImGui.Checkbox("Minion menu in Combat, RP and RP minimal",ref settings.MinionsEnabled))Save();
+            ImGui.TextWrapped("Three rows of twelve unlocked favourites. The combat button appears below Emotes; RP modes use a matching button inside the left frame. Favourites are saved separately for each character.");
+            minions?.DrawSettings();
         }
         if(ImGui.CollapsingHeader("Custom images and backgrounds")) {
             ImGui.TextWrapped("Optional local PNGs are attached behind the selected native element. Keep transparency in the image to leave the native UI visible. No images are enabled by default. Linux paths such as /home/you/Pictures/panel.png are accepted.");
@@ -374,13 +419,14 @@ public sealed unsafe class JobDockNode : OverlayNode
     };
     public int Expanded {get;private set;}=-1;
     public Vector2 EmotesAnchor=>Position+emotes.Position+new Vector2(emotes.Width+12,0);
+    public Vector2 MinionsAnchor=>Position+new Vector2(0,(studio.Settings.Size+studio.Settings.Gap+16)*8+12);
     public override OverlayLayer OverlayLayer=>OverlayLayer.BehindUserInterface;
     public JobDockNode(HudStudio studio,IDataManager data)
     {
         this.studio=studio;Size=new(650,480);
         for(int c=0;c<Groups.Length;c++) {
             int index=c;var group=Groups[c];
-            var category=new IconButtonNode{Size=new(52),IconId=group.Icon,TextTooltip=group.Name,OnClick=()=>{studio.CloseCombatEmotes();Expanded=Expanded==index?-1:index;},IsVisible=true};
+            var category=new IconButtonNode{Size=new(52),IconId=group.Icon,TextTooltip=group.Name,OnClick=()=>{studio.CloseCombatEmotes();studio.CloseMinions();Expanded=Expanded==index?-1:index;},IsVisible=true};
             category.AttachNode(this);categories.Add(category);
             var label=MakeLabel(group.Short);label.AttachNode(this);labels.Add(label);
             foreach(var job in group.Jobs) {
@@ -406,7 +452,7 @@ public sealed unsafe class JobDockNode : OverlayNode
         var root=AtkStage.Instance();
         var viewport=FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.Device.Instance();
         var width=viewport==null?3440:viewport->Width;var height=viewport==null?1440:viewport->Height;
-        Size=new(Math.Max(650,s.Size*9+80),step*8+12);
+        Size=new(Math.Max(650,s.Size*9+80),step*(s.MinionsEnabled?9:8)+12);
         Position=new(Math.Clamp(s.X,0,Math.Max(0,width-s.Size*9-80)),Math.Clamp(s.Y,0,Math.Max(0,height-Size.Y-20)));
         emotes.Position=new(0,step*7+12);emotes.Size=new(s.Size);emotes.IsVisible=studio.CanShowCombatEmotes;emotes.IsChecked=studio.CombatEmotesVisible;
         emotesLabel.Position=emotes.Position+new Vector2(-4,s.Size);emotesLabel.Size=new(s.Size+8,16);emotesLabel.IsVisible=emotes.IsVisible;

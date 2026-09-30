@@ -2,7 +2,7 @@
 
 An opt-in Dalamud customization plugin for FFXIV: combat and RP display profiles, an expandable job dock, native chat styling, fading chat history, local writing tools, and RP speech bubbles.
 
-**Fresh installs retain FFXIV's native appearance.** The dock, borders, images, chat colours, fading, speech bubbles, presence markers, Mouse4 camera control, and automatic Direct Chat management begin disabled. Turn on the features you want in `/ff14remastered` or the plugin's configuration button.
+**Fresh installs retain FFXIV's native appearance.** The dock, minion menu, HUD spacing, borders, images, chat colours, fading, speech bubbles, presence markers, Mouse4 camera control, and automatic Direct Chat management begin disabled. Turn on the features you want in `/ff14remastered` or the plugin's configuration button.
 
 The public name is **FF14 Remastered**. The internal assembly and configuration ID remains `CinematicMode` to preserve existing installations' settings, notes, and layouts. Install one copy only; existing users should replace the previous DLL rather than load both.
 
@@ -10,6 +10,8 @@ The public name is **FF14 Remastered**. The internal assembly and configuration 
 
 - **Display profiles:** select saved combat and RP HUD layouts automatically by monitor aspect ratio, with a combat override and a resize debounce. Manual profile commands are also available.
 - **Job dock:** a vertical category menu opens horizontal rows of jobs. A click equips the job's saved gear set; changes are blocked during combat and other incompatible activities. An optional speaking-head button underneath opens all four RP tool rows.
+- **Minion favourites:** a matching Minion Guide button opens three rows of twelve unlocked minions in Combat, RP, and RP minimal. In Combat it sits below Emotes; RP modes put it inside the left frame. Click to summon or dismiss using the native game action. The currently summoned favourite has a gold label. Favourites are editable in settings, saved separately for each character, and never contain duplicate or locked entries.
+- **HUD spacing:** optionally arrange the three action bars, utility bar, HP/MP, EXP and status groups with clear gaps. The group clears the expanded RP chat area on the tested laptop layout, and popup menus keep space above chat. This option pauses in the native HUD editor and never reveals hidden bars.
 - **RP minimal:** Right Ctrl in the RP profile toggles a framed, quieter view, preserves player nameplates and chat, and optionally enables Direct Chat only while that mode is active. On a combat profile, the key toggles cinematic mode.
 - **Native chat colours:** stable speaker colours, pale message text, purple emotes and gold mentions. Native player and item links are retained.
 - **Presence markers:** blue dots for online friends, green stars for online, red for known offline, grey for unknown, plus RP/Away/Busy labels. Message badges capture status at arrival; clicking one opens a list refreshed from currently available local game data. This is not a global online-status lookup.
@@ -23,7 +25,7 @@ Dice, scene prompts, previews and status responses use local chat output. Other 
 
 ## Compatibility and installation
 
-Version 1.4.0 targets **Dalamud API 15 / .NET 10**, tested against Dalamud **15.0.3.6** on XIVLauncher under Linux/Wine. Native UI structures are game-version-dependent. The same source targets the Windows game API, but a separate Windows session has not been tested. This repository is a standalone community release, not a listing in the official Dalamud plugin repository.
+Version 1.5.0 targets **Dalamud API 15 / .NET 10**, tested against Dalamud **15.0.3.6** on XIVLauncher under Linux/Wine. Native UI structures are game-version-dependent. The same source targets the Windows game API, but a separate Windows session has not been tested. This repository is a standalone community release, not a listing in the official Dalamud plugin repository.
 
 1. Download the ZIP from [Releases](https://github.com/mhykolCS/ff14-remastered/releases) and extract it into a dedicated plugin directory.
 2. Add the extracted `CinematicMode.dll` through Dalamud's **Dev Plugins** settings, then enable it in the plugin installer. Keep `KamiToolKit.dll` and the `assets` directory beside it.
@@ -72,6 +74,8 @@ Commands:
 
 The dock selects an existing recommended gear set for a job, or falls back to another usable saved set. It does not acquire gear or create glamour plates.
 
+The minion menu's initial selection mixes cosy companions, familiar characters and curious creatures. It takes inspiration from [community favourites](https://forum.square-enix.com/ffxiv/threads/491033), then filters against the current character's unlocked collection. It fills remaining slots from other owned minions; characters with fewer than 36 simply have fewer entries. The rest of the collection remains available in the native Minion Guide. Selecting a minion already in the panel swaps its two slots. No minions are purchased, unlocked or summoned automatically.
+
 `/jobsetup preview` reports available jobs and sets. `/jobsetup create` explicitly creates recommended owned-equipment sets using the game's recommendation routine, retaining a saved original outfit and skipping unavailable jobs. Equipment changes should be reviewed in the game's gear-set list.
 
 For the supplied keyboard/G502 layout, hotbar 1 uses `1 2 3 4 Q E R F Z X 5 Mouse5`, hotbar 2 adds Shift, and hotbar 3 adds Ctrl. Mouse4 is reserved for camera look when enabled. Set these keybinds in FFXIV's native keybind menu; the generator arranges hotbar slots, not global keyboard bindings.
@@ -100,6 +104,7 @@ The portable checks do not require the game:
 dotnet run --project tests/CoreChecks -c Release
 dotnet run --project tests/WritingChecks -c Release
 dotnet run --project tests/PolicyChecks -c Release
+dotnet run --project tests/MinionChecks -c Release
 ```
 
 Additional native-payload checks require the host libraries:

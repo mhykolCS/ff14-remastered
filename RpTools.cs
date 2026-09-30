@@ -184,6 +184,7 @@ public sealed class RpPaletteNode : OverlayNode
         var margin=studio.FrameMargin;
         var origin=studio.CombatEmotesVisible?studio.CombatEmotesAnchor:new Vector2(width-Size.X-margin+s.RpOffsetX,height-Size.Y-margin+s.RpOffsetY);
         Position=new(Math.Clamp(origin.X,margin,Math.Max(margin,width-Size.X-margin)),Math.Clamp(origin.Y,margin,Math.Max(margin,height-Size.Y-margin)));
+        Position=studio.ClearChat(Position,Size);
         background.Size=Size;
         for(int r=0;r<4;r++){rowLabels[r].Position=new(12,15+r*rowHeight+size/2-6);rowLabels[r].Size=new(84,20);}
         foreach(var (row,column,data,button,label) in buttons) {
