@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>CinematicMode</AssemblyName>
+    <Version>1.4.0</Version>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DalamudPath Condition="'$(DalamudPath)' == '' and '$(DALAMUD_HOME)' != ''">$(DALAMUD_HOME)</DalamudPath>
+    <DalamudPath Condition="'$(DalamudPath)' == '' and '$(OS)' == 'Windows_NT'">$(APPDATA)/XIVLauncher/addon/Hooks/dev</DalamudPath>
+    <DalamudPath Condition="'$(DalamudPath)' == ''">$(HOME)/.xlcore/dalamud/Hooks/dev</DalamudPath>
+    <PathMap>$(MSBuildProjectDirectory)=/_/FF14Remastered</PathMap>
+    <Deterministic>true</Deterministic>
+    <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+    <FindDependenciesOfExternallyResolvedReferences>false</FindDependenciesOfExternallyResolvedReferences>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <Reference Include="Serilog"><HintPath>$(DalamudPath)/Serilog.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Microsoft.Extensions.ObjectPool"><HintPath>$(DalamudPath)/Microsoft.Extensions.ObjectPool.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="KamiToolKit"><HintPath>lib/KamiToolKit.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="Dalamud.Bindings.ImGui"><HintPath>$(DalamudPath)/Dalamud.Bindings.ImGui.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Dalamud"><HintPath>$(DalamudPath)/Dalamud.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="FFXIVClientStructs"><HintPath>$(DalamudPath)/FFXIVClientStructs.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="InteropGenerator.Runtime"><HintPath>$(DalamudPath)/InteropGenerator.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(DalamudPath)/Newtonsoft.Json.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Lumina"><HintPath>$(DalamudPath)/Lumina.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Lumina.Excel"><HintPath>$(DalamudPath)/Lumina.Excel.dll</HintPath><Private>false</Private></Reference>
+    <None Update="CinematicMode.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="assets/*.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="RuntimeReferences.props" />
+  <Target Name="CheckDalamudPath" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(DalamudPath)/Dalamud.dll')" Text="Set DALAMUD_HOME or -p:DalamudPath to the folder containing the installed Dalamud API 15 assemblies." />
+  </Target>
+</Project>

@@ -1,0 +1,21 @@
+{
+  "Author": "mhykolCS",
+  "Name": "FF14 Remastered",
+  "InternalName": "CinematicMode",
+  "AssemblyVersion": "1.4.0.0",
+  "Description": "Opt-in customization with native FFXIV visuals by default. Open /ff14remastered for display profiles, an expandable job dock, RP tools, chat colours, presence markers, speech bubbles, per-message chat fading and local PNG backgrounds. Right Ctrl toggles RP minimal or cinematic mode.",
+  "Punchline": "Native by default. Customize combat, chat and role-play your way.",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": true,
+  "CanUnloadAsync": false,
+  "Tags": [
+    "hud",
+    "camera",
+    "cinematic",
+    "chat",
+    "rp"
+  ],
+  "RepoUrl": "https://github.com/mhykolCS/ff14-remastered"
+}

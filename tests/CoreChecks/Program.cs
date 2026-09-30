@@ -1,0 +1,33 @@
+using CinematicMode;
+using System.Text;
+int count=0;
+void Check(bool ok,string label){if(!ok)throw new Exception(label);count++;}
+Check(ChatFadePolicy.MessageAlpha(-1)==0,"invalid age stays invisible");
+Check(ChatFadePolicy.MessageAlpha(0)==0,"new messages begin transparent");
+Check(ChatFadePolicy.MessageAlpha(75)==.5f,"150 ms fade in");
+Check(ChatFadePolicy.MessageAlpha(150)==1,"fade in complete");
+Check(ChatFadePolicy.MessageAlpha(20150)==1,"20 seconds fully readable");
+Check(ChatFadePolicy.MessageAlpha(20650)==.5f,"one second fade out");
+Check(ChatFadePolicy.MessageAlpha(21150)==0,"expired message invisible");
+var p=new ChatFadePolicy();long now=0;
+void Tick(bool typing,bool hovering,int milliseconds){for(int i=0;i<milliseconds;i+=10){now+=10;p.Update(now,typing,hovering);}}
+p.Update(now,false,false);Tick(true,false,200);
+Check(p.HistoryAlpha==1,"typing reveals history");
+Tick(false,false,1990);Check(p.HistoryAlpha==1,"empty input keeps history for two seconds");
+Tick(false,false,510);Check(p.HistoryAlpha>0 && p.HistoryAlpha<1,"history then fades");
+Tick(false,false,600);Check(p.HistoryAlpha==0,"empty input eventually hides old history");
+Tick(false,true,200);Check(p.HistoryAlpha==1,"hover reveals history");
+Tick(false,false,1990);Check(p.HistoryAlpha==1,"mouse leave gets same grace");
+Tick(true,false,10);Check(p.HistoryAlpha==1,"typing interrupts hover grace");
+Tick(false,true,100);Check(p.HistoryAlpha==1,"hover preserves history when draft empties");
+Tick(false,false,3200);Check(p.HistoryAlpha==0,"all interactions ended");
+Check(p.Alpha(now,now-10000)==1,"recent messages survive history fade");
+Check(p.Alpha(now,now-30000)==0,"old messages stay faded");
+Tick(false,true,200);Check(p.Alpha(now,now-30000)==1,"hover restores expired messages");
+byte[][] Texts(params string[] s)=>s.Select(Encoding.UTF8.GetBytes).ToArray();
+Check(ChatFadeSequence.Match(Texts("a","b"),Texts("a","b","c")).SequenceEqual(new[]{0,1,-1}),"new message leaves old timers intact");
+Check(ChatFadeSequence.Match(Texts("a","b","c"),Texts("b","c","d")).SequenceEqual(new[]{1,2,-1}),"scroll trimming preserves older timers");
+Check(ChatFadeSequence.Match(Texts("same","same"),Texts("same","same","same")).SequenceEqual(new[]{0,1,-1}),"duplicate messages have independent timers");
+Check(ChatFadeSequence.Match(Texts("b","c"),Texts("a","b","c")).SequenceEqual(new[]{-1,0,1}),"scrolling back matches existing messages");
+Check(ChatFadeSequence.Match(Texts("🌙","hello"),Texts("🌙","hello")).SequenceEqual(new[]{0,1}),"unicode message matching");
+Console.WriteLine($"{count} chat fade timing and message sequence checks passed.");

@@ -1,0 +1,44 @@
+using CinematicMode;
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
+int count=0;
+void Check(bool ok,string name){if(!ok)throw new Exception(name);count++;}
+foreach(var age in new[]{-1L,0,10000,16999,17000,18500,19999,20000,21000}) {
+ var opacity=RpSpeechBubbles.Opacity(age);
+ Check(opacity>=0 && opacity<=1,"opacity bounded");
+ if(age<0 || age>=20000)Check(opacity==0,"expired or invalid bubbles invisible");
+ if(age>=0 && age<=17000)Check(opacity==1,"bubble readable before fade");
+}
+Check(RpSpeechBubbles.Opacity(18500)==.5f,"halfway through fade");
+var source=SeString.Parse(new SeString(new PlayerPayload("Sample Speaker",21),new TextPayload(" shares a 🌙 story.")).Encode());
+var styled=IrohChatStyle.ColorNames(source);
+Check(styled.TextValue==source.TextValue,"name styling preserves all visible text");
+Check(styled.Payloads.OfType<PlayerPayload>().Single().PlayerName=="Sample Speaker","player link preserved");
+Check(styled.Payloads.Any(p=>p.Encode().SequenceEqual(RawPayload.LinkTerminator.Encode())),"link terminator preserved");
+var wrapped=IrohChatStyle.Color(styled,IrohChatStyle.Text);
+Check(wrapped.TextValue==source.TextValue,"body style preserves unicode and linked name");
+Check(SeString.Parse(wrapped.Encode()).TextValue==source.TextValue,"native payload roundtrip");
+Check(IrohChatStyle.NameColor("Sample Speaker")==IrohChatStyle.NameColor("Sample Speaker"),"stable sender colour");
+Check(new[]{"Ari","Mira","Sora","Lumi","Fenn","Kira"}.Select(IrohChatStyle.NameColor).Distinct().Count()>2,"varied sender palette");
+Check(RpFrame.SafeMargin(12)>=82,"frame safe margin clears corner ornament");
+Check(ChatPresence.FromMask(0,false,"test").Kind==PresenceKind.Offline,"explicit offline status");
+Check(ChatPresence.FromMask(1UL<<47,false,"test").Kind==PresenceKind.Online,"normal online status");
+Check(ChatPresence.FromMask(1UL<<9,false,"test").Kind==PresenceKind.Unknown,"unavailable is not offline");
+Check(ChatPresence.FromMask(1UL<<22,false,"test").Activity=="RP","roleplaying status");
+Check(ChatPresence.FromMask(1UL<<17,false,"test").Activity=="Away","away status");
+Check(ChatPresence.FromMask(1UL<<12,false,"test").Activity=="Busy","busy status");
+Check(ChatPresence.Marker(new(PresenceKind.Online,true,"","")).Glyph=="●","online friend dot");
+Check(ChatPresence.Marker(new(PresenceKind.Online,false,"","")).Colour==IrohChatStyle.Green,"online star green");
+Check(ChatPresence.Marker(new(PresenceKind.Unknown,false,"","")).Colour==IrohChatStyle.Muted,"unknown star muted");
+var native=new SeString(new TextPayload("first 🌙"),NewLinePayload.Payload,new TextPayload(" wrapped\rsecond\rsecond\r"));
+var parts=ChatFade.SplitMessages(native.Encode());
+Check(parts.Count==3,"native CR boundaries create three messages");
+Check(SeString.Parse(parts[0].Raw).Payloads.OfType<NewLinePayload>().Count()==1,"soft wrap stays within one message timer");
+Check(SeString.Parse(parts[0].Raw).TextValue.Contains("wrapped"),"wrapped continuation preserved");
+Check(parts[1].Raw.AsSpan().SequenceEqual(parts[2].Raw),"duplicate messages remain separate rows");
+var coloured=IrohChatStyle.Color((SeString)"first\rsecond\r",IrohChatStyle.Green);
+var split=ChatFade.SplitMessages(coloured.Encode());
+Check(split.Count==2,"colour stack at message boundaries does not add phantom rows");
+Check(SeString.Parse(split[1].Styled).TextValue=="second","colour continuation keeps text intact");
+Check(split[1].Styled.Length>split[1].Raw.Length,"native colour context is carried into later message");
+Console.WriteLine($"{count} native chat, presence, bubble and frame checks passed.");
